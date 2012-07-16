@@ -20,22 +20,29 @@ Capistrano::Configuration.instance(:must_exist).load do
     task :notify_deploy_started do
       if hipchat_send_notification
         on_rollback do
+          send_options.merge!(:color => failed_message_color)
           hipchat_client[hipchat_room_name].
-            send(deploy_user, "#{human} cancelled deployment of #{deployment_name} to #{env}.", hipchat_announce)
+            send(deploy_user, "#{human} cancelled deployment of #{deployment_name} to #{env}.", send_options)
         end
 
         message = "#{human} is deploying #{deployment_name} to #{env}"
         message << " (with migrations)" if hipchat_with_migrations
         message << "."
 
-        hipchat_client[hipchat_room_name].
-          send(deploy_user, message, hipchat_announce)
+        hipchat_client[hipchat_room_name].send(deploy_user, message, send_options)
       end
     end
 
     task :notify_deploy_finished do
       hipchat_client[hipchat_room_name].
-        send(deploy_user, "#{human} finished deploying #{deployment_name} to #{env}.", hipchat_announce)
+        send(deploy_user, "#{human} finished deploying #{deployment_name} to #{env}.", send_options)
+    end
+
+    def send_options
+      return @send_options if defined?(@send_options)
+      @send_options = message_color ? {:color => message_color} : {}
+      @send_options.merge!(:notify => message_notification)
+      @send_options
     end
 
     def deployment_name
@@ -45,7 +52,19 @@ Capistrano::Configuration.instance(:must_exist).load do
         application
       end
     end
-    
+
+    def message_color
+      fetch(:hipchat_color, nil)
+    end
+
+    def failed_message_color
+      fetch(:hipchat_failed_color, "red")
+    end
+
+    def message_notification
+      fetch(:hipchat_announce, false)
+    end
+
     def deploy_user
       fetch(:hipchat_deploy_user, "Deploy")
     end
